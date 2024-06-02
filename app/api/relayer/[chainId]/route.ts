@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { ethers } from "ethers";
 import { ERC2771Forwarder } from "@/typechain-types";
 import { abi as ERC2771ForwarderAbi, bytecode as ERC2771ForwarderBytecode } from "@openzeppelin/contracts/build/contracts/ERC2771Forwarder.json";
-import WarheadFactoryAbi from "../../abi/warheadfactory_contract.abi.json";
+import WarheadFactoryAbi from "../../../abi/warheadfactory_contract.abi.json";
 import { Signer } from "ethers";
 import { forwarderAddress, warheadFactoryAddress } from "@/app/contants";
 import { signMetaTxRequest } from "@/app/signer";
@@ -28,7 +28,7 @@ async function relay(forwarder: ERC2771Forwarder, request: any, signature: strin
     return await forwarder.execute({ ...request, signature }, { gasLimit });
 }
 
-async function handler(event: any) {
+async function handler(event: any, chainId: string) {
     // Parse webhook payload
     if (!event.request || !event.request.body) throw new Error(`Missing payload`);
     const { request, signature } = event.request.body;
@@ -39,7 +39,7 @@ async function handler(event: any) {
     const client = new Defender(creds);
     const provider = client.relaySigner.getProvider();
     const signer = await client.relaySigner.getSigner(provider, { speed: 'fast' });
-    const forwarder = new ethers.Contract(forwarderAddress, ERC2771ForwarderAbi, signer as Signer) as unknown as ERC2771Forwarder;
+    const forwarder = new ethers.Contract(forwarderAddress[chainId], ERC2771ForwarderAbi, signer as Signer) as unknown as ERC2771Forwarder;
 
     // Relay transaction!
     const tx = await relay(forwarder, request, signature, []);
@@ -48,7 +48,7 @@ async function handler(event: any) {
 }
 
 
-export const POST = async (req: NextRequest) => {
+export const POST = async (req: NextRequest, { params: { chainId } }: { params: { chainId: string } }) => {
     let data: RelayerData;
     try {
         data = await req.json();
@@ -62,14 +62,14 @@ export const POST = async (req: NextRequest) => {
     const signer = await openzeppelinRelayerClient.relaySigner.getSigner(provider, { speed: 'fast' });
 
     const forwarderFactory = new ethers.ContractFactory(ERC2771ForwarderAbi, ERC2771ForwarderBytecode, signer as Signer);
-    const forwarder = forwarderFactory.attach(forwarderAddress) as ERC2771Forwarder;
+    const forwarder = forwarderFactory.attach(forwarderAddress[chainId] as `0x${string}`) as ERC2771Forwarder;
 
     const originalSigner = new ethers.Wallet(privateKey, provider);
-    const warheadFactoryContract = new ethers.Contract(warheadFactoryAddress, WarheadFactoryAbi, originalSigner);
+    const warheadFactoryContract = new ethers.Contract(warheadFactoryAddress[chainId], WarheadFactoryAbi, originalSigner);
 
     const d = warheadFactoryContract.interface.encodeFunctionData("createWarhead", [ethers.ZeroAddress]);
     const a = await signMetaTxRequest(originalSigner, forwarder, { from: originalSigner.address, to: originalSigner.address, value: 0, data: d });
-    await handler(a);
+    await handler(a, chainId);
 
 
     return NextResponse.json({ success: true });

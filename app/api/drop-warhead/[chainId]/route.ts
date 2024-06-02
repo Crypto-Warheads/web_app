@@ -2,7 +2,7 @@ import { sepoliaProvider } from "@/app/config";
 import { warheadFactoryAddress } from "@/app/contants";
 import { ethers } from "ethers";
 import { NextRequest, NextResponse } from "next/server";
-import WarheadFactoryAbi from "../../abi/warheadfactory_contract.abi.json";
+import WarheadFactoryAbi from "../../../abi/warheadfactory_contract.abi.json";
 import { WarheadFactory } from "@/typechain-types";
 
 type DropWarheadData = {
@@ -12,7 +12,7 @@ type DropWarheadData = {
     dropLong: number;
 }
 
-export const POST = async (req: NextRequest) => {
+export const POST = async (req: NextRequest, { params: { chainId } }: { params: { chainId: string } }) => {
     let data: DropWarheadData;
     try {
         data = await req.json();
@@ -26,7 +26,7 @@ export const POST = async (req: NextRequest) => {
     }
 
     const wallet = new ethers.Wallet(privateKey, sepoliaProvider);
-    const warheadContract = new ethers.Contract(warheadFactoryAddress, WarheadFactoryAbi, wallet) as any as WarheadFactory;
+    const warheadContract = new ethers.Contract(warheadFactoryAddress[chainId], WarheadFactoryAbi, wallet) as any as WarheadFactory;
 
     const impactTime = Date.now() / 1000 | 0;
 
